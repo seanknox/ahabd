@@ -1,0 +1,39 @@
+apiVersion: extensions/v1beta1
+kind: DaemonSet
+metadata:
+  name: ahabd            # Must match `--ds-name`
+  namespace: kube-system # Must match `--ds-namespace`
+spec:
+  template:
+    metadata:
+      labels:
+        name: ahabd
+    spec:
+      serviceAccountName: ahabd
+      containers:
+        - name: ahabd
+          image: docker.io/jpangms/ahabd
+          imagePullPolicy: IfNotPresent
+          command:
+            - /usr/bin/ahabd
+          args:
+            - --period=1h
+# NO USER SERVICEABLE PARTS BEYOND THIS POINT
+          env:
+            # Pass in the name of the node on which this pod is scheduled
+            # for use with drain/uncordon operations and lock acquisition
+            - name: AHABD_NODE_ID
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+          volumeMounts:
+            # Needed for two purposes:
+            # * Testing for the existence of /var/run/reboot-required
+            # * Accessing /var/run/dbus/system_bus_socket to effect reboot
+            - name: hostrun
+              mountPath: /var/run
+      restartPolicy: Always
+      volumes:
+        - name: hostrun
+          hostPath:
+            path: /var/run
