@@ -1,5 +1,5 @@
 .DEFAULT: all
-.PHONY: all clean image publish-image minikube-publish
+.PHONY: all clean image publish-image
 
 DH_ORG=jpangms
 VERSION=$(shell git symbolic-ref --short HEAD)-$(shell git rev-parse --short HEAD)
@@ -26,6 +26,3 @@ image: build/.image.done
 
 publish-image: image
 	docker push docker.io/$(DH_ORG)/ahabd:$(VERSION)
-
-minikube-publish: image
-	docker save docker.io/$(DH_ORG)/ahabd | (eval $$(minikube docker-env) && docker load)

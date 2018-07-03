@@ -6,9 +6,17 @@ import (
 	"os/exec"
 	"time"
 
+	"github.com/juan-lee/ahabd/pkg/docker"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/weaveworks/kured/pkg/delaytick"
+)
+
+const (
+	testContainer = "ahabdtest"
+
+	testImage    = "alpine"
+	testImageTag = "latest"
 )
 
 var (
@@ -49,34 +57,75 @@ func newCommand(name string, arg ...string) *exec.Cmd {
 	return cmd
 }
 
-func restartRequired() bool {
-	log.Infof("Checking if docker daemon needs restart")
+func dockerRestartRequired() bool {
+	log.Infof("Checking docker daemon health")
 
-	curlCmd := newCommand("curl", "--unix-socket", "/var/run/docker.sock", "http://localhost/info")
-	if err := curlCmd.Run(); err != nil {
-		log.Fatalf("Error invoking curl command: %v", err)
+	if err := checkContainerLifecycle(); err != nil {
 		return true
 	}
 
 	return false
 }
 
-func commandRestart(nodeID string) {
-	log.Infof("Commanding docker daemon restart")
+func checkContainerLifecycle() error {
+	log.Infof("Checking if we can run a container")
+
+	docker := docker.New()
+
+	err := docker.ImagePull(testImage, testImageTag)
+	if err != nil {
+		log.Warnf("Error pulling image: %v", err)
+		return err
+	}
+
+	err = docker.ContainerDelete(testContainer)
+	if err != nil {
+		log.Warnf("Error deleting a container: %v", err)
+		return err
+	}
+
+	err = docker.ContainerCreate(testContainer, testImage, testImageTag)
+	if err != nil {
+		log.Warnf("Error creating container: %v", err)
+		return err
+	}
+
+	err = docker.ContainerStart(testContainer)
+	if err != nil {
+		log.Warnf("Error starting container: %v", err)
+		return err
+	}
+
+	err = docker.ContainerWait(testContainer)
+	if err != nil {
+		log.Warnf("Error waiting for container: %v", err)
+		return err
+	}
+
+	log.Infof("Confirmed we can run a container")
+
+	return nil
+}
+
+func commandRestartDocker(nodeID string) error {
+	log.Infof("Restarting docker daemon")
 
 	// Relies on /var/run/dbus/system_bus_socket bind mount to talk to systemd
 	restartCmd := newCommand("/bin/systemctl", "restart", "docker.service")
 	if err := restartCmd.Run(); err != nil {
-		log.Fatalf("Error invoking restart command: %v", err)
+		log.Warnf("Error invoking docker restart command: %v", err)
+		return err
 	}
+
+	return nil
 }
 
-func restartAsRequired(nodeID string) {
+func restartDockerAsRequired(nodeID string) {
 	source := rand.NewSource(time.Now().UnixNano())
 	tick := delaytick.New(source, period)
 	for _ = range tick {
-		if restartRequired() {
-			commandRestart(nodeID)
+		if dockerRestartRequired() {
+			commandRestartDocker(nodeID)
 		}
 	}
 }
@@ -86,13 +135,11 @@ func root(cmd *cobra.Command, args []string) {
 
 	nodeID := os.Getenv("AHABD_NODE_ID")
 	if nodeID == "" {
-		log.Fatal("AHABD_NODE_ID environment variable required")
+		log.Warnf("AHABD_NODE_ID environment variable required")
 	}
 
 	log.Infof("Node ID: %s", nodeID)
 	log.Infof("Docker Restart: every %v", period)
 
-	go restartAsRequired(nodeID)
-
-	time.Sleep(time.Hour)
+	restartDockerAsRequired(nodeID)
 }

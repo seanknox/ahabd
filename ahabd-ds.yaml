@@ -1,19 +1,18 @@
 apiVersion: extensions/v1beta1
 kind: DaemonSet
 metadata:
-  name: ahabd            # Must match `--ds-name`
-  namespace: kube-system # Must match `--ds-namespace`
+  name: ahabd
+  namespace: kube-system
 spec:
   template:
     metadata:
       labels:
         name: ahabd
     spec:
-      serviceAccountName: ahabd
       containers:
         - name: ahabd
-          image: docker.io/jpangms/ahabd
-          imagePullPolicy: IfNotPresent
+          image: docker.io/jpangms/ahabd:master-ea24d1f
+          imagePullPolicy: Always
           command:
             - /usr/bin/ahabd
           args:
