@@ -11,12 +11,12 @@ spec:
     spec:
       containers:
         - name: ahabd
-          image: docker.io/jpangms/ahabd:master-ea24d1f
+          image: docker.io/jpangms/ahabd:master-4c7d905
           imagePullPolicy: Always
           command:
             - /usr/bin/ahabd
           args:
-            - --period=1h
+            - --period=1m
 # NO USER SERVICEABLE PARTS BEYOND THIS POINT
           env:
             # Pass in the name of the node on which this pod is scheduled
