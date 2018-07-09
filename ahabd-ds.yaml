@@ -16,7 +16,7 @@ spec:
           command:
             - /usr/bin/ahabd
           args:
-            - --period=1m
+            - --period=1h
 # NO USER SERVICEABLE PARTS BEYOND THIS POINT
           env:
             # Pass in the name of the node on which this pod is scheduled
