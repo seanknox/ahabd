@@ -26,3 +26,4 @@ image: build/.image.done
 
 publish-image: image
 	docker push docker.io/$(DH_ORG)/ahabd:$(VERSION)
+	docker push docker.io/$(DH_ORG)/ahabd
