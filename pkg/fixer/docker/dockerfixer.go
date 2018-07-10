@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"os"
 	"strings"
 
 	"github.com/coreos/go-systemd/dbus"
@@ -17,22 +18,14 @@ import (
 )
 
 const (
-	testContainer = "ahabdtest"
-
-	testImage    = "alpine"
-	testImageTag = "latest"
-)
-
-var (
-	stdout = log.NewEntry(log.StandardLogger()).
-		WithField("std", "out").
-		WriterLevel(log.InfoLevel)
+	rebootSentinal = "/var/run/reboot-required"
 )
 
 type DockerFixer struct {
 	stats     stats.Stats
 	container containerRunner
 	docker    serviceRestarter
+	system    serviceRestarter
 }
 
 func New(source string) *DockerFixer {
@@ -52,7 +45,7 @@ func NewWithCounter(s stats.Stats) *DockerFixer {
 }
 
 func (df *DockerFixer) NeedsFixing() bool {
-	log.Infof("Checking docker daemon health")
+	log.Infof("checking docker daemon health")
 
 	if err := df.container.Run(); err != nil {
 		return true
@@ -62,7 +55,12 @@ func (df *DockerFixer) NeedsFixing() bool {
 }
 
 func (df *DockerFixer) Fix() error {
-	return df.docker.Restart()
+	err := df.docker.Restart()
+	if err != nil {
+		log.Warnf("restarting docker daemon failed: %v", err)
+		return df.system.Restart()
+	}
+	return nil
 }
 
 func (df *DockerFixer) Stats() stats.Stats {
@@ -76,20 +74,21 @@ type containerRunner interface {
 type dockerContainerRunner struct{}
 
 func (dcr *dockerContainerRunner) Run() error {
-	log.Infof("Checking if we can run a container")
-
+	log.Infof("running a container")
 	ctx := context.Background()
 	cli, err := client.NewEnvClient()
 	if err != nil {
 		return err
 	}
 
+	log.Infof("docker pull docker.io/alpine")
 	reader, err := cli.ImagePull(ctx, "docker.io/library/alpine", types.ImagePullOptions{})
 	if err != nil {
 		return err
 	}
 	defer reader.Close()
 
+	log.Infof("docker create alpine 'echo hello world'")
 	resp, err := cli.ContainerCreate(ctx, &container.Config{
 		Image: "alpine",
 		Cmd:   []string{"echo", "hello world"},
@@ -99,15 +98,18 @@ func (dcr *dockerContainerRunner) Run() error {
 		return err
 	}
 
+	log.Infof("docker start %s", resp.ID)
 	if err := cli.ContainerStart(ctx, resp.ID, types.ContainerStartOptions{}); err != nil {
 		return err
 	}
 
+	log.Infof("docker wait %s", resp.ID)
 	_, err = cli.ContainerWait(ctx, resp.ID)
 	if err != nil {
 		return err
 	}
 
+	log.Infof("docker logs %s", resp.ID)
 	out, err := cli.ContainerLogs(ctx, resp.ID, types.ContainerLogsOptions{ShowStdout: true})
 	if err != nil {
 		return err
@@ -118,12 +120,13 @@ func (dcr *dockerContainerRunner) Run() error {
 		return errors.New(fmt.Sprintf("expected [hello world] got %v [%s]", err, string(b)))
 	}
 
+	log.Infof("docker rm %s", resp.ID)
 	err = cli.ContainerRemove(ctx, resp.ID, types.ContainerRemoveOptions{})
 	if err != nil {
 		return err
 	}
 
-	log.Infof("Confirmed we can run a container")
+	log.Infof("done running a container")
 	return nil
 }
 
@@ -134,7 +137,7 @@ type serviceRestarter interface {
 type dockerRestarter struct{}
 
 func (dr *dockerRestarter) Restart() error {
-	log.Infof("Restarting docker daemon")
+	log.Warnf("restarting docker daemon")
 
 	// Relies on /var/run/dbus/system_bus_socket bind mount to talk to systemd
 	conn, err := dbus.New()
@@ -143,6 +146,7 @@ func (dr *dockerRestarter) Restart() error {
 	}
 	defer conn.Close()
 
+	log.Infof("systemctl restart docker.service")
 	ch := make(chan string)
 	_, err = conn.RestartUnit("docker.service", "replace", ch)
 	if err != nil {
@@ -152,6 +156,28 @@ func (dr *dockerRestarter) Restart() error {
 	resp := <-ch
 	if resp != "done" {
 		return errors.New(fmt.Sprintf("couldn't restart docker - %s", resp))
+	}
+
+	log.Infof("done restarting docker daemon")
+	return nil
+}
+
+type systemRestarter struct{}
+
+func (sr *systemRestarter) Restart() error {
+	log.Warnf("docker daemon requires reboot")
+
+	if _, err := os.Stat(rebootSentinal); err == nil {
+		log.Infof("node is already scheduled for reboot")
+		return nil
+	}
+
+	err := ioutil.WriteFile(
+		rebootSentinal,
+		[]byte("*** System restart required (reason:docker) ***"),
+		0644)
+	if err != nil {
+		return err
 	}
 
 	return nil
