@@ -48,6 +48,7 @@ func (df *DockerFixer) NeedsFixing() bool {
 	log.Infof("checking docker daemon health")
 
 	if err := df.container.Run(); err != nil {
+		log.Warnf("docker health check failed: %v", err)
 		return true
 	}
 
@@ -90,7 +91,7 @@ func (dcr *dockerContainerRunner) Run() error {
 
 	log.Infof("docker create alpine 'echo hello world'")
 	resp, err := cli.ContainerCreate(ctx, &container.Config{
-		Image: "alpine",
+		Image: "docker.io/library/alpine",
 		Cmd:   []string{"echo", "hello world"},
 		Tty:   true,
 	}, nil, nil, "")
