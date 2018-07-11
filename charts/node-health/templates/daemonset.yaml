@@ -1,0 +1,65 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: {{ template "node-health.fullname" . }}
+  labels:
+    app: {{ template "node-health.name" . }}
+    chart: {{ template "node-health.chart" . }}
+    release: {{ .Release.Name }}
+    heritage: {{ .Release.Service }}
+spec:
+  selector:
+    matchLabels:
+      app: {{ template "node-health.name" . }}
+      release: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        app: {{ template "node-health.name" . }}
+        release: {{ .Release.Name }}
+    spec:
+      containers:
+        - name: ahabd
+          image: {{ .Values.ahabd.image.name }}:{{ .Values.ahabd.image.tag }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command:
+            - /usr/bin/ahabd
+          args:
+            - --period={{ .Values.ahabd.period }}
+          env:
+            - name: AHABD_NODE_ID
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+            - name: DOCKER_API_VERSION
+              value: {{ .Values.ahabd.docker.apiVersion | quote }}
+          volumeMounts:
+            # Needed for dropping /var/run/reboot-required if docker is dead
+            - name: hostrun
+              mountPath: /var/run
+        - name: kured
+          image: {{ .Values.kured.image.name }}:{{ .Values.kured.image.tag }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command:
+            - /usr/bin/kured
+          args:
+            - --period={{ .Values.kured.period }}
+            - --reboot-sentinel=/var/run/reboot-required
+            - --ds-name={{ template "node-health.name" . }}
+            - --ds-namespace={{ template "node-health.name" . }}
+          env:
+            - name: KURED_NODE_ID
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+          volumeMounts:
+            # Needed for two purposes:
+            # * Testing for the existence of /var/run/reboot-required
+            # * Accessing /var/run/dbus/system_bus_socket to effect reboot
+            - name: hostrun
+              mountPath: /var/run
+      restartPolicy: Always
+      volumes:
+        - name: hostrun
+          hostPath:
+            path: /var/run

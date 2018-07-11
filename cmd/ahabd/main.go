@@ -41,5 +41,5 @@ func root(cmd *cobra.Command, args []string) {
 	go fixer.PeriodicFix(docker.New("ahabd"), period)
 
 	http.Handle("/metrics", promhttp.Handler())
-	log.Fatal(http.ListenAndServe(":8080", nil))
+	log.Fatal(http.ListenAndServe(":8081", nil))
 }
