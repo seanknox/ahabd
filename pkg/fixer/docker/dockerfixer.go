@@ -88,6 +88,9 @@ func (dcr *dockerContainerRunner) Run() error {
 		return err
 	}
 	defer reader.Close()
+	if b, err := ioutil.ReadAll(reader); err == nil {
+		log.Infof(strings.TrimSpace(string(b)))
+	}
 
 	log.Infof("docker create alpine 'echo hello world'")
 	resp, err := cli.ContainerCreate(ctx, &container.Config{
