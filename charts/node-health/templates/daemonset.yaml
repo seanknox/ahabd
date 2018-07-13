@@ -12,6 +12,8 @@ spec:
     matchLabels:
       app: {{ template "node-health.name" . }}
       release: {{ .Release.Name }}
+  updateStrategy:
+    type: RollingUpdate
   template:
     metadata:
       labels:

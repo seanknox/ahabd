@@ -14,7 +14,7 @@ clean:
 
 ahabd:
 ahabd: *.go
-	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags "-X cmd.version=$(VERSION)" -o $@ *.go
+	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags "-X main.version=$(VERSION)" -o $@ *.go
 
 build/.image.done: Dockerfile ahabd
 	mkdir -p build

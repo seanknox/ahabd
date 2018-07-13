@@ -20,7 +20,8 @@ var (
 	period time.Duration
 )
 
-func Execute() {
+func Execute(ver string) {
+	version = ver
 	rootCmd := &cobra.Command{
 		Use:   "ahabd",
 		Short: "Docker Restart Daemon",
