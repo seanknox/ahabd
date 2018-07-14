@@ -1,4 +1,4 @@
-apiVersion: apps/v1
+apiVersion: "extensions/v1beta1"
 kind: DaemonSet
 metadata:
   name: {{ template "node-health.fullname" . }}
@@ -65,3 +65,8 @@ spec:
         - name: hostrun
           hostPath:
             path: /var/run
+      tolerations:
+        - key: "node-role.kubernetes.io/master"
+          operator: "Equal"
+          value: "true"
+          effect: "NoSchedule"

@@ -8,13 +8,13 @@ ahabd:
   image: 
     name: docker.io/jpangms/ahabd
     tag: latest
-  period: 15m
+  period: 5m
 
 kured:
   image: 
     name: quay.io/weaveworks/kured
     tag: support-k8s-1.10-5731b98
-  period: 15m
+  period: 5m
 
 image:
   pullPolicy: Always
