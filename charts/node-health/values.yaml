@@ -5,7 +5,7 @@ ahabd:
     apiVersion: 1.24
   image: 
     name: docker.io/jpangms/ahabd
-    tag: latest
+    tag: master-9ef7b38
   period: 5m
 
 kured:
