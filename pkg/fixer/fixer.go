@@ -1,6 +1,7 @@
 package fixer
 
 import (
+	"context"
 	"math/rand"
 	"time"
 
@@ -11,35 +12,37 @@ import (
 // Fixer is the interface implemented for anything that needs assessment and
 // repair.
 type Fixer interface {
-	NeedsFixing() bool
-	Fix() error
+	NeedsFixing(ctx context.Context) bool
+	Fix(ctx context.Context) error
 	Stats() stats.Stats
 }
 
 // Fix checks the health of a resource and performs repairs if it's unhealthy.
 // Metrics are kept for the operation.
-func Fix(f Fixer) error {
-	if f.NeedsFixing() {
+func Fix(ctx context.Context, f Fixer) {
+	if f.NeedsFixing(ctx) {
 		s := f.Stats()
 		if s == nil {
 			s = &stats.NullStats{}
 		}
 		s.IncNeedsFixing()
-		if err := f.Fix(); err != nil {
+		if err := f.Fix(ctx); err != nil {
 			s.IncFixFail()
-			return err
 		}
 		s.IncFixed()
 	}
-
-	return nil
 }
 
 // PeriodicFix performs a Fix at the specified interval.
-func PeriodicFix(f Fixer, period time.Duration) {
-	source := rand.NewSource(time.Now().UnixNano())
-	tick := delaytick.New(source, period)
+func PeriodicFix(ctx context.Context, f Fixer, period time.Duration) error {
+	var err error
+	tick := delaytick.New(rand.NewSource(time.Now().UnixNano()), period)
 	for _ = range tick {
-		Fix(f)
+		if err = ctx.Err(); err != nil {
+			return err
+		}
+		Fix(ctx, f)
 	}
+
+	return nil
 }

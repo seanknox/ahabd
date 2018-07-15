@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/coreos/go-systemd/dbus"
 
@@ -18,7 +19,7 @@ import (
 )
 
 const (
-	rebootSentinal = "/var/run/reboot-required"
+	rebootSentinel = "/var/run/reboot-required"
 )
 
 type DockerFixer struct {
@@ -33,6 +34,7 @@ func New(source string) *DockerFixer {
 		stats:     stats.NewDefault(source, "docker"),
 		container: &dockerContainerRunner{},
 		docker:    &dockerRestarter{},
+		system:    &systemRestarter{},
 	}
 }
 
@@ -44,22 +46,35 @@ func NewWithCounter(s stats.Stats) *DockerFixer {
 	}
 }
 
-func (df *DockerFixer) NeedsFixing() bool {
+func (df *DockerFixer) NeedsFixing(ctx context.Context) bool {
 	log.Infof("checking docker daemon health")
+	nf := make(chan bool)
+	ctx, cancel := context.WithTimeout(ctx, 1*time.Minute)
+	defer cancel()
+	go func() {
+		if err := df.container.Run(ctx); err != nil {
+			log.Warnf("docker health check failed: %v", err)
+			nf <- true
+		}
+		nf <- false
+	}()
 
-	if err := df.container.Run(); err != nil {
-		log.Warnf("docker health check failed: %v", err)
-		return true
+	select {
+	case <-ctx.Done():
+		if ctx.Err() == context.DeadlineExceeded {
+			return true
+		}
+		return false
+	case result := <-nf:
+		return result
 	}
-
-	return false
 }
 
-func (df *DockerFixer) Fix() error {
-	err := df.docker.Restart()
+func (df *DockerFixer) Fix(ctx context.Context) error {
+	err := df.docker.Restart(ctx)
 	if err != nil {
 		log.Warnf("restarting docker daemon failed: %v", err)
-		return df.system.Restart()
+		return df.system.Restart(ctx)
 	}
 	return nil
 }
@@ -69,14 +84,13 @@ func (df *DockerFixer) Stats() stats.Stats {
 }
 
 type containerRunner interface {
-	Run() error
+	Run(ctx context.Context) error
 }
 
 type dockerContainerRunner struct{}
 
-func (dcr *dockerContainerRunner) Run() error {
+func (dcr *dockerContainerRunner) Run(ctx context.Context) error {
 	log.Infof("running a container")
-	ctx := context.Background()
 	cli, err := client.NewEnvClient()
 	if err != nil {
 		return err
@@ -135,12 +149,12 @@ func (dcr *dockerContainerRunner) Run() error {
 }
 
 type serviceRestarter interface {
-	Restart() error
+	Restart(ctx context.Context) error
 }
 
 type dockerRestarter struct{}
 
-func (dr *dockerRestarter) Restart() error {
+func (dr *dockerRestarter) Restart(ctx context.Context) error {
 	log.Warnf("restarting docker daemon")
 
 	// Relies on /var/run/dbus/system_bus_socket bind mount to talk to systemd
@@ -168,19 +182,20 @@ func (dr *dockerRestarter) Restart() error {
 
 type systemRestarter struct{}
 
-func (sr *systemRestarter) Restart() error {
+func (sr *systemRestarter) Restart(ctx context.Context) error {
 	log.Warnf("docker daemon requires reboot")
 
-	if _, err := os.Stat(rebootSentinal); err == nil {
+	if _, err := os.Stat(rebootSentinel); err == nil {
 		log.Infof("node is already scheduled for reboot")
 		return nil
 	}
 
 	err := ioutil.WriteFile(
-		rebootSentinal,
+		rebootSentinel,
 		[]byte("*** System restart required (reason:docker) ***"),
 		0644)
 	if err != nil {
+		log.Warnf("failed to write reboot sentinel %v", err)
 		return err
 	}
 
