@@ -4,6 +4,7 @@
 DOCKER_REGISTRY=docker.io
 DOCKER_ORG=jpangms
 VERSION=$(shell git symbolic-ref --short HEAD)-$(shell git rev-parse --short HEAD)
+PKG=github.com/juan-lee/ahabd
 
 all: image
 
@@ -14,7 +15,7 @@ clean:
 
 ahabd:
 ahabd: *.go
-	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags "-X main.version=$(VERSION)" -o $@ *.go
+	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags "-X $(PKG)/pkg/version.Version=$(VERSION)" -o $@ *.go
 
 build/.image.done: Dockerfile ahabd
 	mkdir -p build

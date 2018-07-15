@@ -9,19 +9,17 @@ import (
 
 	"github.com/juan-lee/ahabd/pkg/fixer"
 	"github.com/juan-lee/ahabd/pkg/fixer/docker"
+	"github.com/juan-lee/ahabd/pkg/version"
 
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 var (
-	version = "unreleased"
-
 	// Command line flags
 	period time.Duration
 )
 
-func Execute(ver string) {
-	version = ver
+func Execute() {
 	rootCmd := &cobra.Command{
 		Use:   "ahabd",
 		Short: "Docker Restart Daemon",
@@ -37,7 +35,7 @@ func Execute(ver string) {
 }
 
 func root(cmd *cobra.Command, args []string) {
-	log.Infof("Docker Health Daemon: %s", version)
+	log.Infof("Docker Health Daemon: %s", version.Version)
 	log.Infof("Docker Health Check: every %v", period)
 
 	go fixer.PeriodicFix(docker.New("ahabd"), period)
