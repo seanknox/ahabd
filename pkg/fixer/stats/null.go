@@ -1,12 +1,14 @@
 package stats
 
-type NullStats struct{}
+type nullStats struct{}
 
-func (s *NullStats) IncNeedsFixing() {
+// NewNullStats returns a null metrics provider implementation.
+func NewNullStats() Stats {
+	return &nullStats{}
 }
 
-func (s *NullStats) IncFixed() {
-}
+func (s *nullStats) IncNeedsFixing() {}
 
-func (s *NullStats) IncFixFail() {
-}
+func (s *nullStats) IncFixed() {}
+
+func (s *nullStats) IncFixFail() {}

@@ -13,6 +13,7 @@ type prometheusStats struct {
 	fixFailCounter     prometheus.Counter
 }
 
+// NewDefault returns a default prometheus metrics provider implementation.
 func NewDefault(source, name string) Stats {
 	return &prometheusStats{
 		needsFixingCounter: promauto.NewCounter(prometheus.CounterOpts{

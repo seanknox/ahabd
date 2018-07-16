@@ -1,6 +1,7 @@
 package fixer
 
 import (
+	"context"
 	"errors"
 	"testing"
 
@@ -34,11 +35,11 @@ type fakeFixer struct {
 	stats       *fakeStats
 }
 
-func (f *fakeFixer) NeedsFixing() bool {
+func (f *fakeFixer) NeedsFixing(ctx context.Context) bool {
 	return f.needsFixing
 }
 
-func (f *fakeFixer) Fix() error {
+func (f *fakeFixer) Fix(ctx context.Context) error {
 	if f.err == nil {
 		f.fixed = true
 	}
@@ -53,15 +54,17 @@ func (f *fakeFixer) Stats() stats.Stats {
 }
 
 func TestNoFixNullStats(t *testing.T) {
+	ctx := context.Background()
 	ff := &fakeFixer{needsFixing: false, err: nil}
-	assert.Nil(t, Fix(ff))
+	assert.Nil(t, Fix(ctx, ff))
 	assert.Equal(t, false, ff.fixed)
 	assert.Nil(t, ff.stats)
 }
 
 func TestNoFix(t *testing.T) {
+	ctx := context.Background()
 	ff := &fakeFixer{needsFixing: false, err: nil, stats: &fakeStats{}}
-	assert.Nil(t, Fix(ff))
+	assert.Nil(t, Fix(ctx, ff))
 	assert.Equal(t, false, ff.fixed)
 	assert.Equal(t, 0, ff.stats.needsFixing)
 	assert.Equal(t, 0, ff.stats.fixed)
@@ -69,23 +72,26 @@ func TestNoFix(t *testing.T) {
 }
 
 func TestNeedsFixNullStats(t *testing.T) {
+	ctx := context.Background()
 	ff := &fakeFixer{needsFixing: true, err: nil}
-	assert.Nil(t, Fix(ff))
+	assert.Nil(t, Fix(ctx, ff))
 	assert.Equal(t, true, ff.fixed)
 	assert.Nil(t, ff.stats)
 }
 
 func TestNeedsFix(t *testing.T) {
+	ctx := context.Background()
 	ff := &fakeFixer{needsFixing: true, err: nil, stats: &fakeStats{}}
-	assert.Nil(t, Fix(ff))
+	assert.Nil(t, Fix(ctx, ff))
 	assert.Equal(t, true, ff.fixed)
 	assert.Equal(t, 1, ff.stats.needsFixing)
 	assert.Equal(t, 1, ff.stats.fixed)
 }
 
 func TestNeedsFixError(t *testing.T) {
+	ctx := context.Background()
 	ff := &fakeFixer{needsFixing: true, err: errors.New("Fix Failed"), stats: &fakeStats{}}
-	assert.Equal(t, ff.err, Fix(ff))
+	assert.Equal(t, ff.err, Fix(ctx, ff))
 	assert.Equal(t, false, ff.fixed)
 	assert.Equal(t, 1, ff.stats.needsFixing)
 	assert.Equal(t, 0, ff.stats.fixed)

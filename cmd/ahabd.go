@@ -21,6 +21,7 @@ var (
 	period time.Duration
 )
 
+// Execute invokes the CLI.
 func Execute() {
 	rootCmd := &cobra.Command{
 		Use:   "ahabd",

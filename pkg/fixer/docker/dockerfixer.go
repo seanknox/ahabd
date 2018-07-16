@@ -1,7 +1,6 @@
 package docker
 
 import (
-	"errors"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -13,6 +12,7 @@ import (
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/client"
+	"github.com/juan-lee/ahabd/pkg/fixer"
 	"github.com/juan-lee/ahabd/pkg/fixer/stats"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
@@ -22,15 +22,16 @@ const (
 	rebootSentinel = "/var/run/reboot-required"
 )
 
-type DockerFixer struct {
+type dockerFixer struct {
 	stats     stats.Stats
 	container containerRunner
 	docker    serviceRestarter
 	system    serviceRestarter
 }
 
-func New(source string) *DockerFixer {
-	return &DockerFixer{
+// New returns a new docker fixer responsible for monitoring and fixing docker.
+func New(source string) fixer.Fixer {
+	return &dockerFixer{
 		stats:     stats.NewDefault(source, "docker"),
 		container: &dockerContainerRunner{},
 		docker:    &dockerRestarter{},
@@ -38,15 +39,16 @@ func New(source string) *DockerFixer {
 	}
 }
 
-func NewWithCounter(s stats.Stats) *DockerFixer {
-	return &DockerFixer{
+// NewWithCounter returns a new docker fixer that allows for a custome counter implementation.
+func NewWithCounter(s stats.Stats) fixer.Fixer {
+	return &dockerFixer{
 		stats:     s,
 		container: &dockerContainerRunner{},
 		docker:    &dockerRestarter{},
 	}
 }
 
-func (df *DockerFixer) NeedsFixing(ctx context.Context) bool {
+func (df *dockerFixer) NeedsFixing(ctx context.Context) bool {
 	log.Infof("checking docker daemon health")
 	nf := make(chan bool)
 	ctx, cancel := context.WithTimeout(ctx, 1*time.Minute)
@@ -70,7 +72,7 @@ func (df *DockerFixer) NeedsFixing(ctx context.Context) bool {
 	}
 }
 
-func (df *DockerFixer) Fix(ctx context.Context) error {
+func (df *dockerFixer) Fix(ctx context.Context) error {
 	err := df.docker.Restart(ctx)
 	if err != nil {
 		log.Warnf("restarting docker daemon failed: %v", err)
@@ -79,7 +81,7 @@ func (df *DockerFixer) Fix(ctx context.Context) error {
 	return nil
 }
 
-func (df *DockerFixer) Stats() stats.Stats {
+func (df *dockerFixer) Stats() stats.Stats {
 	return df.stats
 }
 
@@ -102,9 +104,13 @@ func (dcr *dockerContainerRunner) Run(ctx context.Context) error {
 		return err
 	}
 	defer reader.Close()
-	if b, err := ioutil.ReadAll(reader); err == nil {
-		log.Infof(strings.TrimSpace(string(b)))
+
+	b, err := ioutil.ReadAll(reader)
+	if err != nil {
+		return err
 	}
+
+	log.Infof(strings.TrimSpace(string(b)))
 
 	log.Infof("docker create alpine 'echo hello world'")
 	resp, err := cli.ContainerCreate(ctx, &container.Config{
@@ -117,7 +123,7 @@ func (dcr *dockerContainerRunner) Run(ctx context.Context) error {
 	}
 
 	log.Infof("docker start %s", resp.ID)
-	if err := cli.ContainerStart(ctx, resp.ID, types.ContainerStartOptions{}); err != nil {
+	if err = cli.ContainerStart(ctx, resp.ID, types.ContainerStartOptions{}); err != nil {
 		return err
 	}
 
@@ -134,8 +140,8 @@ func (dcr *dockerContainerRunner) Run(ctx context.Context) error {
 	}
 	defer out.Close()
 
-	if b, err := ioutil.ReadAll(out); err != nil || strings.TrimSpace(string(b)) != "hello world" {
-		return errors.New(fmt.Sprintf("expected [hello world] got %v [%s]", err, string(b)))
+	if b, err = ioutil.ReadAll(out); err != nil || strings.TrimSpace(string(b)) != "hello world" {
+		return fmt.Errorf("expected [hello world] got %v [%s]", err, string(b))
 	}
 
 	log.Infof("docker rm %s", resp.ID)
@@ -173,7 +179,7 @@ func (dr *dockerRestarter) Restart(ctx context.Context) error {
 
 	resp := <-ch
 	if resp != "done" {
-		return errors.New(fmt.Sprintf("couldn't restart docker - %s", resp))
+		return fmt.Errorf("couldn't restart docker - %s", resp)
 	}
 
 	log.Infof("done restarting docker daemon")
