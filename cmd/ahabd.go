@@ -25,7 +25,7 @@ var (
 func Execute() {
 	rootCmd := &cobra.Command{
 		Use:   "ahabd",
-		Short: "Docker Restart Daemon",
+		Short: "Node Health Daemon",
 		Run:   root,
 	}
 
@@ -38,12 +38,15 @@ func Execute() {
 }
 
 func root(cmd *cobra.Command, args []string) {
-	log.Infof("Docker Health Daemon: %s", version.Version)
-	log.Infof("Docker Health Check: every %v", period)
+	log.Infof("Daemon Version: %s", version.Version)
+	log.Infof("Health Check: every %v", period)
 
 	g, ctx := errgroup.WithContext(newContext())
 	g.Go(func() error {
 		return fixer.PeriodicFix(ctx, docker.New("ahabd"), period)
+	})
+	g.Go(func() error {
+		return fixer.PeriodicFix(ctx, fixer.NewKubeProxy("ahabd"), period)
 	})
 	g.Go(func() error {
 		return serveMetrics(ctx)
