@@ -1,6 +1,9 @@
 package kubernetes
 
 import (
+	"fmt"
+	"strings"
+
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
@@ -45,4 +48,20 @@ func GetPods() ([]corev1.Pod, error) {
 	}
 
 	return pl.Items, nil
+}
+
+// GetPodByPrefix will return the first pod where the name attribute matches the prefix supplied for a given node.
+func GetPodByPrefix(prefix, nodeName string) (*corev1.Pod, error) {
+	pods, err := GetPods()
+	if err != nil {
+		return nil, err
+	}
+	for _, p := range pods {
+		if p.Spec.NodeName == nodeName {
+			if strings.HasPrefix(p.Name, prefix) {
+				return &p, nil
+			}
+		}
+	}
+	return nil, fmt.Errorf("A pod with prefix (%s) does not exist on node %s", prefix, nodeName)
 }

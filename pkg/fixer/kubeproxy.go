@@ -48,7 +48,7 @@ func (k *kubeProxyFixer) NeedsFixing(ctx context.Context) bool {
 		log.Printf("Error trying to fetch node name: %s", err)
 		return false
 	}
-	kubeProxy, err := getKubeProxyPod(nodeName)
+	kubeProxy, err := kubernetes.GetPodByPrefix("kube-proxy", nodeName)
 	if err != nil {
 		log.Printf("Error trying to get kube-proxy pod: %s", err)
 		return false
@@ -92,21 +92,6 @@ func isHealthy(pod *corev1.Pod) bool {
 		return false
 	}
 	return true
-}
-
-func getKubeProxyPod(nodeName string) (*corev1.Pod, error) {
-	pods, err := kubernetes.GetPods()
-	if err != nil {
-		return nil, err
-	}
-	for _, p := range pods {
-		if p.Spec.NodeName == nodeName {
-			if strings.HasPrefix(p.Name, "kube-proxy") {
-				return &p, nil
-			}
-		}
-	}
-	return nil, fmt.Errorf("kube-proxy pod does not exist on node: %s", nodeName)
 }
 
 // UnmarshalJSON is a helper function to unmarshal non-standard time from JSON to struct
