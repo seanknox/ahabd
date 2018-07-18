@@ -33,7 +33,7 @@ type KubeProxyHealthz struct {
 	Current     Time `json:"currentTime"`
 }
 
-// NewKubeProxy returns a new docker fixer responsible for monitoring and fixing docker.
+// NewKubeProxy returns a new kube proxy fixer responsible for monitoring and fixing kube proxy.
 func NewKubeProxy(source string) Fixer {
 	return &kubeProxyFixer{
 		stats: stats.NewDefault(source, "kube_proxy"),
