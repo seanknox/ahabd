@@ -59,7 +59,7 @@ func (k *kubeProxyFixer) NeedsFixing(ctx context.Context) bool {
 
 // Fix performs the operation of fixing KubeProxy
 func (k *kubeProxyFixer) Fix(ctx context.Context) error {
-	log.Info("fixing kube-proxy")
+	log.Info("fixing kube-proxy -- This is a noop for now. We are observing only!")
 	return nil
 }
 
