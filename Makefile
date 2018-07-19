@@ -1,8 +1,8 @@
 .DEFAULT: all
 .PHONY: all clean lint image publish-image
 
-DOCKER_REGISTRY=docker.io
-DOCKER_ORG=jpangms
+DOCKER_REGISTRY ?= docker.io
+DOCKER_ORG ?= jpangms
 VERSION=$(shell git symbolic-ref --short HEAD)-$(shell git rev-parse --short HEAD)
 PKG=github.com/juan-lee/ahabd
 
