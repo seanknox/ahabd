@@ -1,0 +1,54 @@
+variables:
+  goPath: '/root/go'
+  goBin: '/root/go/bin'
+  goAppName: 'juan-lee/ahabd'
+
+  #Multi-configuration and multi-agent phase options are not exported to YAML. Configure these options using the documentation: https://docs.microsoft.com/vsts/build-release/concepts/process/phases
+queue:
+  name: Hosted Linux Preview
+
+steps:
+- task: GoTool@0
+  displayName: Use Go 1.10
+  inputs:
+      goPath: $(goPath)
+
+- script: |
+    mkdir -p /root/go/bin
+    curl https://raw.githubusercontent.com/golang/dep/master/install.sh | sh
+  displayName: Install dep
+
+- script: echo "##vso[task.setvariable variable=path;isOutput=true]$PATH"
+  name: existingpath
+
+- script: |
+    mkdir -p /root/go/src/github.com/juan-lee/ahabd
+    cp -r . /root/go/src/github.com/juan-lee/ahabd
+    ls -alh /root/go/src/github.com/juan-lee/ahabd
+  displayName: move src to $gopath
+  env:
+    PATH: $(goPath)/src:$(existingpath.path)
+
+- script: |
+    dep ensure
+  displayName: dep ensure
+  workingDirectory: /root/go/src/github.com/juan-lee/ahabd
+  env:
+    PATH: $(goBin):$(goPath)/src:$(existingpath.path)
+
+- script: |
+    make all
+  displayName: make all
+  workingDirectory: /root/go/src/github.com/juan-lee/ahabd
+  env:
+    PATH: $(goPath)/src:$(existingpath.path)
+    IMAGE_REPO: node-health
+
+- script: |
+    docker login ${DOCKER_REGISTRY} -u ${DOCKER_USERNAME} -p ${DOCKER_PASSWORD}
+    make publish-immutable-image
+  displayName: docker login && make publish-immutable-image
+  workingDirectory: /root/go/src/github.com/juan-lee/ahabd
+  env:
+    PATH: $(goPath)/src:$(existingpath.path)
+    IMAGE_REPO: node-health
