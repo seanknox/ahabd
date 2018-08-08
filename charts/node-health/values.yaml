@@ -3,13 +3,13 @@
 ahabd:
   docker:
     apiVersion: 1.24
-  image: 
+  image:
     name: docker.io/jpangms/ahabd
     tag: master-9ef7b38
   period: 5m
 
 kured:
-  image: 
+  image:
     name: quay.io/weaveworks/kured
     tag: support-k8s-1.10-5731b98
   period: 5m
@@ -27,7 +27,7 @@ resources:
 
 # Run the DaemonSet all nodes including masters
 tolerations:
-  - key: "node-role.kubernetes.io/master"
-    operator: "Equal"
-    value: "true"
-    effect: "NoSchedule"
+	- operator: Exists
+	  effect: NoExecute
+	- operator: Exists
+	  effect: NoSchedule
